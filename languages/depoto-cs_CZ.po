@@ -1,0 +1,129 @@
+# Copyright (C) 2024 Depoto
+# This file is distributed under the same license as the Depoto plugin.
+msgid ""
+msgstr ""
+"Project-Id-Version: Depoto 1.2.2\n"
+"Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/depoto\n"
+"POT-Creation-Date: 2024-09-20T16:00:44+02:00\n"
+"PO-Revision-Date: 2024-09-20 16:09+0200\n"
+"Last-Translator: \n"
+"Language-Team: \n"
+"Language: cs_CZ\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=3; plural=(n==1 ? 0 : n>=2 && n<=4 ? 1 : 2);\n"
+"X-Generator: Poedit 3.0.1\n"
+"X-Domain: depoto\n"
+
+#. Plugin Name of the plugin
+#. Author of the plugin
+msgid "Depoto"
+msgstr ""
+
+#. Plugin URI of the plugin
+#. Author URI of the plugin
+msgid "https://www.depoto.cz"
+msgstr ""
+
+#. Description of the plugin
+msgid "Plugin for connecting Woocommerce with Depoto"
+msgstr "Plugin pro propojení Woocommerce s Depotem"
+
+#: admin-page.php:8
+msgid "Settings Saved"
+msgstr "Nastavení uloženo"
+
+#: admin-page.php:22
+msgid "Pairing"
+msgstr "Párování"
+
+#: admin-page.php:23
+msgid "Products"
+msgstr "Produkty"
+
+#: admin-page.php:24
+msgid "Orders"
+msgstr "Objednávky"
+
+#: admin-page.php:25
+msgid "Webhook"
+msgstr "Webhook"
+
+#: admin-page.php:26
+msgid "Settings"
+msgstr "Nastavení"
+
+#: depoto.php:103 depoto.php:117 depoto.php:127 depoto.php:142 depoto.php:163
+msgid "Be sure that you have installed and active Woocommerce."
+msgstr "Ujistěte se, že máte nainstalovaný a aktivní Woocommerce."
+
+#: depoto.php:109 depoto.php:174
+msgid "Save Settings"
+msgstr "Uložit nastavení"
+
+#: depoto.php:134
+msgid "Send undelivered orders"
+msgstr "Odeslat nedoručené objednávky"
+
+#: depoto.php:149
+msgid "Webhook for Depoto Events:"
+msgstr "Webhook pro události Depoto:"
+
+#: depoto.php:151
+msgid "Cron for process webhook stack:"
+msgstr "Cron pro zpracování zásobníku webhooků:"
+
+#: depoto.php:154
+msgid "Process webhook stack"
+msgstr "Zpracovat zásobník webhooků"
+
+#: depoto.php:168
+msgid "Connection established"
+msgstr "Spojení navázáno"
+
+#: depoto.php:170
+msgid "Connection not established"
+msgstr "Spojení nebylo navázáno"
+
+#: includes/class-depoto-order-statuses.php:93
+msgid "Order statuses"
+msgstr "Stavy objednávek"
+
+#: includes/class-depoto-order.php:136
+msgid "Order %s already has depoto order id %s"
+msgstr "Objednávka %s již má Depoto ID objednávky %s"
+
+#: includes/class-depoto-order.php:173
+msgid "Order %s successfuly sent and received order depoto ID %s"
+msgstr "Objednávka % byla úspěšně odeslána a přijato Depoto ID objednávky %s"
+
+#: includes/class-depoto-payments.php:96
+msgid "Payments"
+msgstr "Platby"
+
+#: includes/class-depoto-settings.php:31
+msgid ""
+"TEST: https://server1.depoto.cz.tomatomstage.cz, PROD: https://server1."
+"depoto.cz"
+msgstr ""
+
+#: includes/class-depoto-settings.php:72
+msgid "Depoto Settings"
+msgstr "Nastavení Depoto"
+
+#: includes/class-depoto-shippings.php:98
+msgid "Shippings"
+msgstr "Dopravy"
+
+#: includes/class-depoto-taxes.php:110
+msgid "Taxes"
+msgstr "Daně"
+
+#: includes/class-depoto-webhook.php:96
+msgid "There are no records in the stack."
+msgstr "V zásobníku nejsou žádné záznamy."
+
+#: includes/class-depoto-webhook.php:228
+msgid "%s setted order status to %s"
+msgstr "%s nastavil stav objednávky na %s"

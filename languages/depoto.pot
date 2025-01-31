@@ -1,0 +1,130 @@
+# Copyright (C) 2024 Depoto
+# This file is distributed under the same license as the Depoto plugin.
+msgid ""
+msgstr ""
+"Project-Id-Version: Depoto 1.2.2\n"
+"Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/depoto\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"POT-Creation-Date: 2024-09-20T16:00:44+02:00\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"X-Generator: WP-CLI 2.7.1\n"
+"X-Domain: depoto\n"
+
+#. Plugin Name of the plugin
+#. Author of the plugin
+msgid "Depoto"
+msgstr ""
+
+#. Plugin URI of the plugin
+#. Author URI of the plugin
+msgid "https://www.depoto.cz"
+msgstr ""
+
+#. Description of the plugin
+msgid "Plugin for connecting Woocommerce with Depoto"
+msgstr ""
+
+#: admin-page.php:8
+msgid "Settings Saved"
+msgstr ""
+
+#: admin-page.php:22
+msgid "Pairing"
+msgstr ""
+
+#: admin-page.php:23
+msgid "Products"
+msgstr ""
+
+#: admin-page.php:24
+msgid "Orders"
+msgstr ""
+
+#: admin-page.php:25
+msgid "Webhook"
+msgstr ""
+
+#: admin-page.php:26
+msgid "Settings"
+msgstr ""
+
+#: depoto.php:103
+#: depoto.php:117
+#: depoto.php:127
+#: depoto.php:142
+#: depoto.php:163
+msgid "Be sure that you have installed and active Woocommerce."
+msgstr ""
+
+#: depoto.php:109
+#: depoto.php:174
+msgid "Save Settings"
+msgstr ""
+
+#: depoto.php:134
+msgid "Send undelivered orders"
+msgstr ""
+
+#: depoto.php:149
+msgid "Webhook for Depoto Events:"
+msgstr ""
+
+#: depoto.php:151
+msgid "Cron for process webhook stack:"
+msgstr ""
+
+#: depoto.php:154
+msgid "Process webhook stack"
+msgstr ""
+
+#: depoto.php:168
+msgid "Connection established"
+msgstr ""
+
+#: depoto.php:170
+msgid "Connection not established"
+msgstr ""
+
+#: includes/class-depoto-order-statuses.php:93
+msgid "Order statuses"
+msgstr ""
+
+#: includes/class-depoto-order.php:136
+msgid "Order %s already has depoto order id %s"
+msgstr ""
+
+#: includes/class-depoto-order.php:173
+msgid "Order %s successfuly sent and received order depoto ID %s"
+msgstr ""
+
+#: includes/class-depoto-payments.php:96
+msgid "Payments"
+msgstr ""
+
+#: includes/class-depoto-settings.php:31
+msgid "TEST: https://server1.depoto.cz.tomatomstage.cz, PROD: https://server1.depoto.cz"
+msgstr ""
+
+#: includes/class-depoto-settings.php:72
+msgid "Depoto Settings"
+msgstr ""
+
+#: includes/class-depoto-shippings.php:98
+msgid "Shippings"
+msgstr ""
+
+#: includes/class-depoto-taxes.php:110
+msgid "Taxes"
+msgstr ""
+
+#: includes/class-depoto-webhook.php:96
+msgid "There are no records in the stack."
+msgstr ""
+
+#: includes/class-depoto-webhook.php:228
+msgid "%s setted order status to %s"
+msgstr ""

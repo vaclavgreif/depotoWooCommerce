@@ -1,0 +1,10 @@
+.tab-content,
+.tab-content input[type=submit] {
+	margin-top: 1em;
+}
+
+.url-tip {
+	margin-left: 1rem;
+	font-size: 0.8rem;
+	color: #000;
+}

@@ -1,0 +1,11 @@
+{
+    "require": {
+        "guzzlehttp/guzzle": "^7.8",
+        "symfony/console": "^6.4",
+        "tomatom/depoto-php-client": "^1.0",
+        "symfony/http-client": "^6.4",
+        "nyholm/psr7": "^1.8",
+        "symfony/cache": "^6.4",
+        "monolog/monolog": "^2.9"
+    }
+}
