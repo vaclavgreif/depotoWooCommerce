@@ -14,8 +14,14 @@ class Depoto_Order
 	public function __construct($depoto_api)
 	{
 		$this->depoto_api = $depoto_api;
-		add_action('woocommerce_thankyou', [$this, 'process_order']);
+		add_action('woocommerce_checkout_order_created', [$this,'schedule_order']);
+		add_action('depoto_create_order', [$this, 'process_order']);
+
 		$this->taxes_pairs = $this->get_taxes_pairs();
+	}
+
+	public function schedule_order( $order ) {
+		as_enqueue_async_action('depoto_create_order', ['order_id' => $order->get_id()]);
 	}
 
 	/**

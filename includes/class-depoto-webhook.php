@@ -221,8 +221,11 @@ class Depoto_Webhook
 		if (!$woocommerce_order_new_state) {
 			return false;
 		}
+
+		$new_status = substr($woocommerce_order_new_state_key, 3);
+
 		// substr remove 'wc-' prefix which si not needed for set_status() method
-		$woocommerce_order->set_status(substr($woocommerce_order_new_state_key, 3));
+		$woocommerce_order->set_status($new_status,sprintf(__('Depoto Webhook: Order status updated to %s', 'depoto'), wc_get_order_status_name($new_status)));
 		$woocommerce_order->save();
 
 		printf(__('%s setted order status to %s', 'depoto'), $id, $woocommerce_order_new_state_key);
