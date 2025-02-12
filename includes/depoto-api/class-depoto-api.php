@@ -12,39 +12,36 @@ use Symfony\Component\HttpClient\Psr18Client;
 /**
  * @package         Depoto_API
  */
-class Depoto_API
-{
+class Depoto_API {
 	private $depoto;
 	private $url;
 	private $username;
 	private $password;
 
-	public function __construct()
-	{
-		if (!defined('CURL_SSLVERSION_TLSv1_2')) {
-			define('CURL_SSLVERSION_TLSv1_2', 6);
+	public function __construct() {
+		if ( ! defined( 'CURL_SSLVERSION_TLSv1_2' ) ) {
+			define( 'CURL_SSLVERSION_TLSv1_2', 6 );
 		}
 		$this->set_login_params();
 		$this->init_connection();
 	}
 
-	public function init_connection()
-	{
+	public function init_connection() {
 		try {
-			$httpClient = new Psr18Client(); // PSR-18 Http client
+			$httpClient   = new Psr18Client(); // PSR-18 Http client
 			$psr17Factory = new Psr17Factory(); // PSR-17 HTTP Factories,  PSR-7 HTTP message
-			$cache = new Psr16Cache(new ArrayAdapter()); // PSR-16 Simple cache
-			$logger = new Logger('Depoto', [new StreamHandler('depoto.log', Logger::DEBUG)]); // PSR-3 Logger
+			$cache        = new Psr16Cache( new ArrayAdapter() ); // PSR-16 Simple cache
+			$logger       = new Logger( 'Depoto', [ new StreamHandler( 'depoto.log', Logger::DEBUG ) ] ); // PSR-3 Logger
 
-			$depoto = new Client($httpClient, $psr17Factory, $psr17Factory, $cache, $logger);
+			$depoto = new Client( $httpClient, $psr17Factory, $psr17Factory, $cache, $logger );
 			$depoto
-				->setBaseUrl($this->url) 
-                                // Stage (for testing): https://server1.depoto.cz.tomatomstage.cz
+				->setBaseUrl( $this->url )
+				// Stage (for testing): https://server1.depoto.cz.tomatomstage.cz
 				// Prod: https://server1.depoto.cz
-				->setUsername($this->username)
-				->setPassword($this->password);
+				->setUsername( $this->username )
+				->setPassword( $this->password );
 			$this->depoto = $depoto;
-		} catch (Exception $e) {
+		} catch ( Exception $e ) {
 			echo $e->getMessage();
 		}
 	}
@@ -54,11 +51,10 @@ class Depoto_API
 	 *
 	 * @return void
 	 */
-	public function set_login_params(): void
-	{
-		$depoto_settings = get_option('depoto_settings', []);
+	public function set_login_params(): void {
+		$depoto_settings = get_option( 'depoto_settings', [] );
 
-		$this->url = $depoto_settings['url'] ?? '';
+		$this->url      = $depoto_settings['url'] ?? '';
 		$this->username = $depoto_settings['username'] ?? '';
 		$this->password = $depoto_settings['password'] ?? '';
 	}
@@ -69,8 +65,7 @@ class Depoto_API
 	 *
 	 * @return array Associative array of Depoto payments as ['id_of_payment' => 'name_of_payment']
 	 */
-	public function get_payments_pairs(): array
-	{
+	public function get_payments_pairs(): array {
 		$return = [];
 		try {
 
@@ -86,19 +81,20 @@ class Depoto_API
 					]
 				]
 			);
-		} catch (Exception $e) {
+		} catch ( Exception $e ) {
 			return $return;
 		}
 
-		if (empty($result)) {
+		if ( empty( $result ) ) {
 			return $return;
 		}
 
-		foreach ($result['items'] as $item) {
-			if (!empty($item)) {
-				$return['id_' . $item['id']] = $item['type']['name'];
+		foreach ( $result['items'] as $item ) {
+			if ( ! empty( $item ) ) {
+				$return[ 'id_' . $item['id'] ] = $item['type']['name'];
 			}
 		}
+
 		return $return;
 	}
 
@@ -107,8 +103,7 @@ class Depoto_API
 	 *
 	 * @return array Associative array of Depoto carriers as ['id_of_carrier' => 'name_of_carrier']
 	 */
-	public function get_carriers_pairs(): array
-	{
+	public function get_carriers_pairs(): array {
 		$return = [];
 		try {
 			$result = $this->depoto->query(
@@ -117,24 +112,26 @@ class Depoto_API
 				[
 					'items' => [
 						'carrier' => [
-							'id', 'name'
+							'id',
+							'name'
 						]
 					]
 				]
 			);
-		} catch (Exception $e) {
+		} catch ( Exception $e ) {
 			return $return;
 		}
 
-		if (empty($result)) {
+		if ( empty( $result ) ) {
 			return $return;
 		}
 
-		foreach ($result['items'] as $item) {
-			if (!empty($item)) {
-				$return[$item['carrier']['id']] = $item['carrier']['name'];
+		foreach ( $result['items'] as $item ) {
+			if ( ! empty( $item ) ) {
+				$return[ $item['carrier']['id'] ] = $item['carrier']['name'];
 			}
 		}
+
 		return $return;
 	}
 
@@ -144,30 +141,29 @@ class Depoto_API
 	 *
 	 * @return array Associative array of Depoto order statuses as ['id_of_order_state' => 'name_of_order_state']
 	 */
-	public function get_order_statuses_pairs(): array
-	{
+	public function get_order_statuses_pairs(): array {
 
 		$return = [
-			'recieved' => 'Přijatá',
-			'picking' => 'Vyskladnění',
-			'packing' => 'Balení',
-			'packed' =>	'Zabaleno',
-			'dispatched' =>	'Předáno dopravci',
-			'delivered' => 'Doručeno',
-			'returned' => 'Nedoručeno (Vráceno)',
+			'recieved'      => 'Přijatá',
+			'picking'       => 'Vyskladnění',
+			'packing'       => 'Balení',
+			'packed'        => 'Zabaleno',
+			'dispatched'    => 'Předáno dopravci',
+			'delivered'     => 'Doručeno',
+			'returned'      => 'Nedoručeno (Vráceno)',
 			'picking_error' => 'Chyba vyskladnění',
-			'cancelled' => 'Zrušeno'
+			'cancelled'     => 'Zrušeno'
 		];
 
 		return $return;
 	}
+
 	/**
 	 * Get taxes from Depoto
 	 *
 	 * @return array Associative array of Depoto order statuses as ['id_of_order_state' => 'name_of_order_state']
 	 */
-	public function get_taxes_pairs(): array
-	{
+	public function get_taxes_pairs(): array {
 		$return = [];
 		try {
 
@@ -176,23 +172,25 @@ class Depoto_API
 				[],
 				[
 					'items' => [
-						'id', 'name'
+						'id',
+						'name'
 					]
 				]
 			);
-		} catch (Exception $e) {
+		} catch ( Exception $e ) {
 			return $return;
 		}
 
-		if (empty($result)) {
+		if ( empty( $result ) ) {
 			return $return;
 		}
 
-		foreach ($result['items'] as $item) {
-			if (!empty($item)) {
-				$return[$item['id']] = $item['name'];
+		foreach ( $result['items'] as $item ) {
+			if ( ! empty( $item ) ) {
+				$return[ $item['id'] ] = $item['name'];
 			}
 		}
+
 		return $return;
 	}
 
@@ -201,17 +199,16 @@ class Depoto_API
 	 *
 	 * @return array Array of Depoto products
 	 */
-	public function get_products_pairs(): array
-	{
+	public function get_products_pairs(): array {
 		$return = [];
 		try {
 
 			$result_paginator = $this->depoto->query(
 				'products',
 				[],
-				['paginator' => ['last']]
+				[ 'paginator' => [ 'last' ] ]
 			);
-		} catch (Exception $e) {
+		} catch ( Exception $e ) {
 			return $return;
 		}
 
@@ -219,21 +216,26 @@ class Depoto_API
 
 		$all_products = [];
 
-		for ($i = 1; $i <= $number_of_pages; $i++) {
+		for ( $i = 1; $i <= $number_of_pages; $i ++ ) {
 
 			$result = $this->depoto->query(
 				'products',
-				['page' => $i],
-				['items' => [
-					'id', 'name', 'ean', 'code',
-				]],
+				[ 'page' => $i ],
+				[
+					'items' => [
+						'id',
+						'name',
+						'ean',
+						'code',
+					]
+				],
 			);
 
-			$all_products = array_merge($all_products, $result['items']);
+			$all_products = array_merge( $all_products, $result['items'] );
 		}
 
-		foreach ($all_products as $product) {
-			$return[$product['code']] = ['id' => $product['id'], 'name' => $product['name']];
+		foreach ( $all_products as $product ) {
+			$return[ $product['code'] ] = [ 'id' => $product['id'], 'name' => $product['name'] ];
 		}
 
 
@@ -243,28 +245,30 @@ class Depoto_API
 	/**
 	 * Get product availability by Id from Depoto
 	 *
-	 * @param  int $id
+	 * @param int $id
+	 *
 	 * @return int
 	 */
-	public function get_product_availability_by_ID(int $id): int
-	{
-		$return = -1;
+	public function get_product_availability_by_ID( int $id ): int {
+		$return = - 1;
 		try {
 			$result = $this->depoto->query(
 				'product',
-				['id' => $id],
-				['data' => [
-					'quantities' => [
-						'quantityAvailable'
+				[ 'id' => $id ],
+				[
+					'data' => [
+						'quantities' => [
+							'quantityAvailable'
+						]
 					]
-				]]
+				]
 			);
-		} catch (Exception $e) {
+		} catch ( Exception $e ) {
 			return $return;
 		}
 
 
-		$return = intval($result["data"]["quantities"][0]["quantityAvailable"]) ?? -1;
+		$return = intval( $result["data"]["quantities"][0]["quantityAvailable"] ) ?? - 1;
 
 		return $return;
 	}
@@ -272,23 +276,25 @@ class Depoto_API
 	/**
 	 * Get order status by Id from Depoto
 	 *
-	 * @param  int $id
+	 * @param int $id
+	 *
 	 * @return string
 	 */
-	public function get_order_status_by_ID(int $id): string
-	{
+	public function get_order_status_by_ID( int $id ): string {
 		$return = '';
 		try {
 			$result = $this->depoto->query(
 				'order',
-				['id' => $id],
-				['data' => [
-					'processStatus' => [
-						'id'
+				[ 'id' => $id ],
+				[
+					'data' => [
+						'processStatus' => [
+							'id'
+						]
 					]
-				]]
+				]
 			);
-		} catch (Exception $e) {
+		} catch ( Exception $e ) {
 			return $return;
 		}
 
@@ -304,40 +310,56 @@ class Depoto_API
 	 *
 	 * @return int ID of the result address in depoto
 	 */
-	public function create_address($order_address): int
-	{
+	public function create_address( $order_address ): int {
 		try {
 
 			$resultAddress = $this->depoto->mutation(
 				'createAddress',
 				$order_address,
-				['data' => ['id']]
+				[ 'data' => [ 'id' ] ]
 			);
-		} catch (Exception $e) {
+		} catch ( Exception $e ) {
 			return 0;
 		}
 
 		return $resultAddress['data']['id'];
 	}
 
+	/**
+	 * Create address in depoto
+	 *
+	 * @return int ID of the result address in depoto
+	 * @throws Exception
+	 */
+	public function update_order( array $data ) {
+		if ( ! $data['id'] ) {
+			throw new Exception( 'Order ID is missing' );
+		}
+		return $this->depoto->mutation(
+			'updateOrder',
+			$data,
+			[ 'data' => [ 'id' ], 'errors' ] );
 
-	public function create_order($data): int
-	{
+	}
+
+
+	public function create_order( $data ): int {
 		try {
 
-			$result = $this->depoto->mutation('createOrder', $data, ['data' => ['id']]);
-		} catch (Exception $e) {
+			$result = $this->depoto->mutation( 'createOrder', $data, [ 'data' => [ 'id' ] ] );
+		} catch ( Exception $e ) {
 			return 0;
 		}
+
 		return $result['data']['id'];
 	}
+
 	/**
 	 * Check if the connection is established by simple query
 	 *
 	 * @return bool
 	 */
-	public function is_connected(): bool
-	{
+	public function is_connected(): bool {
 
 		$return = false;
 
@@ -348,11 +370,12 @@ class Depoto_API
 				[],
 				[
 					'items' => [
-						'id', 'name'
+						'id',
+						'name'
 					]
 				]
 			);
-		} catch (Exception $e) {
+		} catch ( Exception $e ) {
 			return $return;
 		}
 

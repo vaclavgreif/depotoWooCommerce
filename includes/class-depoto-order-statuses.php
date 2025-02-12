@@ -56,6 +56,31 @@ class Depoto_Order_Statuses
 		foreach ($this->order_statuses as $id => $value) {
 			$this->add_field($id, $value, $this->depoto_api_order_statuses_pairs);
 		}
+
+
+		add_settings_field(
+			$id,
+			__('Paid order statuses', 'depoto'),
+			function () {
+				$args = [
+					'label_for' => 'depoto_paid_order_statuses',
+				];
+				$id = esc_attr($args['label_for']) . '[]';
+				$paid_order_statuses = get_option('depoto_paid_order_statuses') ?: [];
+				echo "<select name='$id' id='$id' multiple='multiple'>";
+				foreach ($this->order_statuses as $key => $label) {
+					echo "<option value='$key' " . (in_array($key, $paid_order_statuses) ? 'selected' : '') . ">$label</option>";
+				}
+				echo '</select>';
+			},
+			'depoto',
+			'depoto_order_statuses',
+			array(
+				'label_for' => $id,
+				'class' => 'depoto-order_statuses-' . $id,
+			)
+		);
+
 	}
 
 	private function add_field($id, $value, $depoto_order_statuses_pairs)
@@ -114,6 +139,17 @@ class Depoto_Order_Statuses
 		}
 
 		update_option('depoto_order_statuses', $depoto_order_statuses, true);
+
+		$depoto_paid_order_statuses = $_POST['depoto_paid_order_statuses'] ?? [];
+		if ($depoto_paid_order_statuses) {
+			$depoto_paid_order_statuses = array_filter($depoto_paid_order_statuses, function ($value) {
+				return in_array($value, array_keys($this->order_statuses));
+			});
+		}
+
+		update_option('depoto_paid_order_statuses', $depoto_paid_order_statuses, true);
+
+
 
 		return true;
 	}
