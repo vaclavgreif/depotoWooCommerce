@@ -172,6 +172,7 @@ class Depoto_Order
 				'currency' => $this->order->get_currency(),
 				'carrier' => $this->process_carrier(),
 				'items' => $this->process_order_items(),
+				'reservationNumber' => $this->order->get_order_number(),
 				'paymentItems' => [
 					[
 						'payment' => $this->process_payment(),
