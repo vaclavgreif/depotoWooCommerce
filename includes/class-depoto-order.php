@@ -11,11 +11,27 @@ class Depoto_Order
 	private $taxes_pairs;
 	/** as ['percent' => 'depoto_id'] */
 
+	/**
+	 * @param $depoto_api Depoto_API
+	 */
 	public function __construct($depoto_api)
 	{
 		$this->depoto_api = $depoto_api;
-		add_action('woocommerce_thankyou', [$this, 'process_order']);
+		add_action('woocommerce_checkout_order_created', [$this,'schedule_order']);
+		add_action('depoto_create_order', [$this, 'process_order']);
+		$paid_order_statuses = get_option('depoto_paid_order_statuses') ?: [];
+
+		foreach ( $paid_order_statuses as $paid_order_status ) {
+			$status = str_replace('wc-', '', $paid_order_status);
+			add_action('woocommerce_order_status_' . $status, [$this,'schedule_update_payment_status']);
+		}
+
+		add_action('depoto_update_payment_status', [$this,'update_order_payment_status']);
 		$this->taxes_pairs = $this->get_taxes_pairs();
+	}
+
+	public function schedule_order( $order ) {
+		as_enqueue_async_action('depoto_create_order', ['order_id' => $order->get_id()]);
 	}
 
 	/**
@@ -156,6 +172,7 @@ class Depoto_Order
 				'currency' => $this->order->get_currency(),
 				'carrier' => $this->process_carrier(),
 				'items' => $this->process_order_items(),
+				'reservationNumber' => $this->order->get_order_number(),
 				'paymentItems' => [
 					[
 						'payment' => $this->process_payment(),
@@ -329,5 +346,36 @@ class Depoto_Order
 		$return_array[] = $payment_item;
 
 		return $return_array;
+	}
+
+	public function schedule_update_payment_status( $order_id ) {
+		as_enqueue_async_action('depoto_update_payment_status', ['order_id' => $order_id]);
+	}
+
+
+	public function update_order_payment_status( $order_id ) {
+		$this->order = wc_get_order($order_id);
+		$depoto_order_id = $this->order->get_meta('_depoto_order_id');
+		if (!$depoto_order_id) {
+			return;
+		}
+
+		try {
+			$this->depoto_api->update_order(
+				[
+					'id'           => $depoto_order_id,
+					'paymentItems' => [
+						[
+							'payment' => $this->process_payment(),
+							'amount'  => $this->order->get_total(),
+							'isPaid'  => true
+						],
+					],
+				]
+			);
+			$this->order->add_order_note(__('Depoto order set to paid.', 'depoto'));
+		} catch ( Exception $e ) {
+			$this->order->add_order_note(sprintf(__('Depoto order payment status update failed, error: %s', 'depoto'), $e->getMessage()));
+		}
 	}
 }
