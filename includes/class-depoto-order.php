@@ -19,13 +19,7 @@ class Depoto_Order
 		$this->depoto_api = $depoto_api;
 		add_action('woocommerce_checkout_order_created', [$this,'schedule_order']);
 		add_action('depoto_create_order', [$this, 'process_order']);
-		$paid_order_statuses = get_option('depoto_paid_order_statuses') ?: [];
-
-		foreach ( $paid_order_statuses as $paid_order_status ) {
-			$status = str_replace('wc-', '', $paid_order_status);
-			add_action('woocommerce_order_status_' . $status, [$this,'schedule_update_payment_status']);
-		}
-
+		add_action('woocommerce_order_status_changed', [$this,'schedule_update_payment_status'], 10, 3);
 		add_action('depoto_update_payment_status', [$this,'update_order_payment_status']);
 		$this->taxes_pairs = $this->get_taxes_pairs();
 	}
@@ -348,7 +342,22 @@ class Depoto_Order
 		return $return_array;
 	}
 
-	public function schedule_update_payment_status( $order_id ) {
+	public function schedule_update_payment_status( $order_id, $old_status, $new_status ) {
+		$order = wc_get_order($order_id);
+		if (!$order) {
+			return;
+		}
+		$payment_method = $order->get_payment_method();
+		if (!$payment_method) {
+			return;
+		}
+		$id = 'depoto_paid_order_statuses_' . $payment_method;
+		$paid_order_statuses = get_option($id) ?: [];
+		$paid_order_statuses = array_map(fn($item) => str_replace('wc-', '', $item), $paid_order_statuses);
+		if (!in_array($new_status, $paid_order_statuses)) {
+			return;
+		}
+
 		as_enqueue_async_action('depoto_update_payment_status', ['order_id' => $order_id]);
 	}
 
