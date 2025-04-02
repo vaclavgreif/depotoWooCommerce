@@ -137,27 +137,46 @@ class Depoto_API {
 
 	/**
 	 * Get order statuses from Depoto
-	 * Depoto does not have an endpoint for the list of order statuses so this method is instead of that
 	 *
 	 * @return array Associative array of Depoto order statuses as ['id_of_order_state' => 'name_of_order_state']
 	 */
 	public function get_order_statuses_pairs(): array {
 
-		$return = [
-			'recieved'      => 'Přijatá',
-			'picking'       => 'Vyskladnění',
-			'packing'       => 'Balení',
-			'packed'        => 'Zabaleno',
-			'dispatched'    => 'Předáno dopravci',
-			'delivered'     => 'Doručeno',
-			'returned'      => 'Nedoručeno (Vráceno)',
-			'picking_error' => 'Chyba vyskladnění',
-			'cancelled'     => 'Zrušeno'
-		];
+		/**
+		 * Get payment methods from Depoto
+		 *
+		 * @return array Associative array of Depoto payments as ['id_of_payment' => 'name_of_payment']
+		 */
+
+		$return = [];
+		try {
+
+			$result = $this->depoto->query(
+				'processStatuses',
+				[],
+				[
+					'items' => [
+						'id',
+						'name'
+					]
+				]
+			);
+		} catch ( Exception $e ) {
+			return $return;
+		}
+
+		if ( empty( $result ) ) {
+			return $return;
+		}
+
+		foreach ( $result['items'] as $item ) {
+			if ( ! empty( $item ) ) {
+				$return[ $item['id'] ] = $item['name'];
+			}
+		}
 
 		return $return;
 	}
-
 	/**
 	 * Get taxes from Depoto
 	 *
@@ -342,6 +361,18 @@ class Depoto_API {
 
 	}
 
+	/**
+	 * Create address in depoto
+	 *
+	 * @return int ID of the result address in depoto
+	 * @throws Exception
+	 */
+	public function cancel_order( $id ) {
+		return $this->depoto->mutation(
+			'deleteReservation',
+			['id' => $id],
+			[ 'errors' ] );
+	}
 
 	public function create_order( $data ): int {
 		try {

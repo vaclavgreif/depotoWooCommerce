@@ -57,29 +57,34 @@ class Depoto_Order_Statuses
 			$this->add_field($id, $value, $this->depoto_api_order_statuses_pairs);
 		}
 
+		foreach ( WC()->payment_gateways()->payment_gateways as $gateway ) {
+			$option_id = 'depoto_paid_order_statuses_'. $gateway->id;
+			add_settings_field(
+				$option_id,
+				sprintf(__('Paid order statuses for %s', 'depoto'), $gateway->id),
+				function () use ($gateway, $option_id) {
+					$args = [
+						'label_for' => $option_id,
+					];
+					$id = esc_attr(sprintf('%s_%s', $args['label_for'], $gateway->id)) . '[]';
+					$name = esc_attr(sprintf('%s[]', $option_id));
+					$paid_order_statuses = get_option($option_id) ?: [];
+					echo "<select name='$name' id='$id' multiple='multiple'>";
+					foreach ($this->order_statuses as $key => $label) {
+						echo "<option value='$key' " . (in_array($key, $paid_order_statuses) ? 'selected' : '') . ">$label</option>";
+					}
+					echo '</select>';
+				},
+				'depoto',
+				'depoto_order_statuses',
+				array(
+					'label_for' => $id,
+					'class' => 'depoto-order_statuses-' . $id,
+				)
+			);
 
-		add_settings_field(
-			$id,
-			__('Paid order statuses', 'depoto'),
-			function () {
-				$args = [
-					'label_for' => 'depoto_paid_order_statuses',
-				];
-				$id = esc_attr($args['label_for']) . '[]';
-				$paid_order_statuses = get_option('depoto_paid_order_statuses') ?: [];
-				echo "<select name='$id' id='$id' multiple='multiple'>";
-				foreach ($this->order_statuses as $key => $label) {
-					echo "<option value='$key' " . (in_array($key, $paid_order_statuses) ? 'selected' : '') . ">$label</option>";
-				}
-				echo '</select>';
-			},
-			'depoto',
-			'depoto_order_statuses',
-			array(
-				'label_for' => $id,
-				'class' => 'depoto-order_statuses-' . $id,
-			)
-		);
+		}
+
 
 	}
 
@@ -140,16 +145,19 @@ class Depoto_Order_Statuses
 
 		update_option('depoto_order_statuses', $depoto_order_statuses, true);
 
-		$depoto_paid_order_statuses = $_POST['depoto_paid_order_statuses'] ?? [];
-		if ($depoto_paid_order_statuses) {
-			$depoto_paid_order_statuses = array_filter($depoto_paid_order_statuses, function ($value) {
-				return in_array($value, array_keys($this->order_statuses));
-			});
+		foreach ( WC()->payment_gateways()->payment_gateways as $gateway ) {
+			$option_id = 'depoto_paid_order_statuses_'. $gateway->id;
+			$depoto_paid_order_statuses = !empty($_POST[$option_id]) ? $_POST[$option_id] : [];
+
+			if ( $depoto_paid_order_statuses ) {
+				$depoto_paid_order_statuses = array_filter( $depoto_paid_order_statuses, function ( $value ) {
+					return in_array( $value, array_keys( $this->order_statuses ) );
+				} );
+			}
+
+			update_option( $option_id, $depoto_paid_order_statuses, true );
+
 		}
-
-		update_option('depoto_paid_order_statuses', $depoto_paid_order_statuses, true);
-
-
 
 		return true;
 	}
