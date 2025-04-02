@@ -361,6 +361,18 @@ class Depoto_API {
 
 	}
 
+	/**
+	 * Create address in depoto
+	 *
+	 * @return int ID of the result address in depoto
+	 * @throws Exception
+	 */
+	public function cancel_order( $id ) {
+		return $this->depoto->mutation(
+			'deleteReservation',
+			['id' => $id],
+			[ 'errors' ] );
+	}
 
 	public function create_order( $data ): int {
 		try {
