@@ -1,4 +1,5 @@
 <?php
+
 require __DIR__ . '/vendor/autoload.php';
 
 use Depoto\Client;
@@ -68,7 +69,6 @@ class Depoto_API {
 	public function get_payments_pairs(): array {
 		$return = [];
 		try {
-
 			$result = $this->depoto->query(
 				'payments',
 				[],
@@ -76,9 +76,9 @@ class Depoto_API {
 					'items' => [
 						'id',
 						'type' => [
-							'name'
-						]
-					]
+							'name',
+						],
+					],
 				]
 			);
 		} catch ( Exception $e ) {
@@ -92,6 +92,42 @@ class Depoto_API {
 		foreach ( $result['items'] as $item ) {
 			if ( ! empty( $item ) ) {
 				$return[ 'id_' . $item['id'] ] = $item['type']['name'];
+			}
+		}
+
+		return $return;
+	}
+
+	/**
+	 * Get payment methods from Depoto
+	 *
+	 * @return array Associative array of Depoto payments as ['id_of_payment' => 'name_of_payment']
+	 */
+	public function get_checkouts(): array {
+		$return = [];
+		try {
+			$result = $this->depoto->query(
+				'checkouts',
+				[],
+				[
+					'items' => [
+						'id',
+						'name',
+					],
+				]
+			);
+		} catch ( Exception $e ) {
+			return $return;
+		}
+
+		if ( empty( $result ) ) {
+			return $return;
+		}
+
+
+		foreach ( $result['items'] as $item ) {
+			if ( ! empty( $item ) ) {
+				$return[ $item['id'] ] = $item['name'];
 			}
 		}
 
@@ -113,9 +149,9 @@ class Depoto_API {
 					'items' => [
 						'carrier' => [
 							'id',
-							'name'
-						]
-					]
+							'name',
+						],
+					],
 				]
 			);
 		} catch ( Exception $e ) {
@@ -141,7 +177,6 @@ class Depoto_API {
 	 * @return array Associative array of Depoto order statuses as ['id_of_order_state' => 'name_of_order_state']
 	 */
 	public function get_order_statuses_pairs(): array {
-
 		/**
 		 * Get payment methods from Depoto
 		 *
@@ -150,15 +185,14 @@ class Depoto_API {
 
 		$return = [];
 		try {
-
 			$result = $this->depoto->query(
 				'processStatuses',
 				[],
 				[
 					'items' => [
 						'id',
-						'name'
-					]
+						'name',
+					],
 				]
 			);
 		} catch ( Exception $e ) {
@@ -177,6 +211,7 @@ class Depoto_API {
 
 		return $return;
 	}
+
 	/**
 	 * Get taxes from Depoto
 	 *
@@ -185,15 +220,14 @@ class Depoto_API {
 	public function get_taxes_pairs(): array {
 		$return = [];
 		try {
-
 			$result = $this->depoto->query(
 				'vats',
 				[],
 				[
 					'items' => [
 						'id',
-						'name'
-					]
+						'name',
+					],
 				]
 			);
 		} catch ( Exception $e ) {
@@ -221,7 +255,6 @@ class Depoto_API {
 	public function get_products_pairs(): array {
 		$return = [];
 		try {
-
 			$result_paginator = $this->depoto->query(
 				'products',
 				[],
@@ -236,7 +269,6 @@ class Depoto_API {
 		$all_products = [];
 
 		for ( $i = 1; $i <= $number_of_pages; $i ++ ) {
-
 			$result = $this->depoto->query(
 				'products',
 				[ 'page' => $i ],
@@ -246,7 +278,7 @@ class Depoto_API {
 						'name',
 						'ean',
 						'code',
-					]
+					],
 				],
 			);
 
@@ -277,9 +309,9 @@ class Depoto_API {
 				[
 					'data' => [
 						'quantities' => [
-							'quantityAvailable'
-						]
-					]
+							'quantityAvailable',
+						],
+					],
 				]
 			);
 		} catch ( Exception $e ) {
@@ -308,9 +340,9 @@ class Depoto_API {
 				[
 					'data' => [
 						'processStatus' => [
-							'id'
-						]
-					]
+							'id',
+						],
+					],
 				]
 			);
 		} catch ( Exception $e ) {
@@ -331,7 +363,6 @@ class Depoto_API {
 	 */
 	public function create_address( $order_address ): int {
 		try {
-
 			$resultAddress = $this->depoto->mutation(
 				'createAddress',
 				$order_address,
@@ -354,11 +385,11 @@ class Depoto_API {
 		if ( ! $data['id'] ) {
 			throw new Exception( 'Order ID is missing' );
 		}
+
 		return $this->depoto->mutation(
 			'updateOrder',
 			$data,
 			[ 'data' => [ 'id' ], 'errors' ] );
-
 	}
 
 	/**
@@ -370,14 +401,33 @@ class Depoto_API {
 	public function cancel_order( $id ) {
 		return $this->depoto->mutation(
 			'deleteReservation',
-			['id' => $id],
+			[ 'id' => $id ],
 			[ 'errors' ] );
 	}
 
 	public function create_order( $data ): int {
 		try {
-
 			$result = $this->depoto->mutation( 'createOrder', $data, [ 'data' => [ 'id' ] ] );
+		} catch ( Exception $e ) {
+			return 0;
+		}
+
+		return $result['data']['id'];
+	}
+
+	public function create_product( $data ): int {
+		try {
+			$result = $this->depoto->mutation( 'createProduct', $data, [ 'data' => [ 'id' ] ] );
+		} catch ( Exception $e ) {
+			return 0;
+		}
+
+		return $result['data']['id'];
+	}
+
+	public function create_file( $data ): int {
+		try {
+			$result = $this->depoto->mutation( 'createFile', $data, [ 'data' => [ 'id' ] ] );
 		} catch ( Exception $e ) {
 			return 0;
 		}
@@ -391,7 +441,6 @@ class Depoto_API {
 	 * @return bool
 	 */
 	public function is_connected(): bool {
-
 		$return = false;
 
 		// This is just a random query, which find out vats, we can use anything else to test the connection
@@ -402,8 +451,8 @@ class Depoto_API {
 				[
 					'items' => [
 						'id',
-						'name'
-					]
+						'name',
+					],
 				]
 			);
 		} catch ( Exception $e ) {
