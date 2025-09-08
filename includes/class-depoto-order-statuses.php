@@ -90,6 +90,7 @@ class Depoto_Order_Statuses
 
 	private function add_field($id, $value, $depoto_order_statuses_pairs)
 	{
+		$depoto_order_statuses_pairs = array_merge(['' => __('-- Select Depoto Order Status --', 'depoto')], $depoto_order_statuses_pairs);
 		add_settings_field(
 			$id,
 			__($value, 'depoto'),

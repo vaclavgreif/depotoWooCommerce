@@ -65,6 +65,7 @@ class Depoto_Shippings
 
 	private function add_field($id, $value, $depoto_shippings_pairs)
 	{
+		$depoto_shippings_pairs = array_merge(['' => __('-- Select Depoto Shipping --', 'depoto')], $depoto_shippings_pairs);
 		add_settings_field(
 			$id,
 			__($value, 'depoto'),

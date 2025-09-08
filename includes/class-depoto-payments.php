@@ -63,6 +63,7 @@ class Depoto_Payments {
 	}
 
 	private function add_field( $id, $value, $depoto_payments_pairs, $selected = '' ) {
+		$depoto_payments_pairs = array_merge(['' => __('-- Select --', 'depoto')], $depoto_payments_pairs);
 		add_settings_field(
 			$id,
 			__( $value, 'depoto' ),

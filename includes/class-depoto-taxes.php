@@ -72,6 +72,7 @@ class Depoto_Taxes
 
 	private function add_field($id, $value, $depoto_taxes_pairs)
 	{
+		$depoto_taxes_pairs = array_merge(['' => __('-- Select tax --', 'depoto')], $depoto_taxes_pairs);
 		add_settings_field(
 			$id,
 			__($value, 'depoto'),
