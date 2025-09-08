@@ -59,20 +59,24 @@ class Depoto_Payments {
 		}
 		$checkout_id = get_option( 'depoto_checkout_id' );
 
-		$this->add_field( 'checkout_id', 'Checkout', $this->depoto_api_checkouts );
+		$this->add_field( 'checkout_id', 'Checkout', $this->depoto_api_checkouts, $checkout_id );
 	}
 
 	private function add_field( $id, $value, $depoto_payments_pairs, $selected = '' ) {
-		$depoto_payments_pairs = array_merge(['' => __('-- Select --', 'depoto')], $depoto_payments_pairs);
+		$depoto_payments_pairs = array_replace(['' => __('-- Select --', 'depoto')], $depoto_payments_pairs);
+
 		add_settings_field(
 			$id,
 			__( $value, 'depoto' ),
 			function ( $args ) use ( $depoto_payments_pairs, $selected ) {
 				$id = esc_attr( $args['label_for'] );
-				$selected = $selected ?: $this->depoto_payments_options[ $id ] ?? '';
+				if (!$selected) {
+					$selected = $this->depoto_payments_options[ $id ] ?? '';
+				}
+
 				echo "<select name='$id' id='$id' >";
 				foreach ( $depoto_payments_pairs as $val => $depoto_title ) {
-					echo "<option value='$val' " . ( ( $val === $selected ) ? 'selected' : '' ) . ">$depoto_title</option>";
+					echo "<option value='$val' " . ( ( strval($val) === strval($selected) ) ? 'selected' : '' ) . ">$depoto_title</option>";
 				}
 				echo '</select>';
 			},
