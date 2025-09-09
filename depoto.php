@@ -286,8 +286,12 @@ class Depoto {
 			$data = [
 				'name'      => $p->get_name(),
 				'code'      => $p->get_sku(),
-				'sellPrice' => $p->get_price(),
 			];
+
+			if ($p->get_price()) {
+				$data['sellPrice'] = $p->get_price();
+			}
+
 			if ( $p->is_type( 'variation' ) ) {
 				$parent = wc_get_product( $p->get_parent_id() );
 				if ( ! $parent->get_meta( '_depoto_id' ) ) {

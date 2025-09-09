@@ -59,6 +59,9 @@ class Depoto_Products {
 			$product->update_meta_data( '_depoto_id', $this->depoto_products[ $product_sku ]['id'] );
 			$product->save_meta_data();
 		} else {
+			$product->delete_meta_data('_depoto_id');
+			$product->save_meta_data();
+
 			echo '<strong style="color:red">' . $product->get_name() . '</strong> --> ' . __( 'Depoto product ID not found' ) . '<br>';
 		}
 	}
