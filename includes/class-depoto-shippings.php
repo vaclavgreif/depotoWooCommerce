@@ -71,6 +71,7 @@ class Depoto_Shippings
 			__($value, 'depoto'),
 			function ($args) use ($depoto_shippings_pairs) {
 				$id = esc_attr($args['label_for']);
+				$id = html_entity_decode($id);
 
 				echo "<select name='$id' id='$id' >";
 				foreach ($depoto_shippings_pairs as $depoto_id => $depoto_title) {
