@@ -41,7 +41,7 @@ class Depoto_Payments {
 	 * @return array
 	 */
 	private function get_woocommerce_available_payment_methods(): array {
-		$available_payments = WC()->payment_gateways()->get_available_payment_gateways();
+		$available_payments = WC()->payment_gateways()->payment_gateways();
 		if ( empty( $available_payments ) ) {
 			return [];
 		}
