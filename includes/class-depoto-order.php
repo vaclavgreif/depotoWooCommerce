@@ -189,6 +189,7 @@ class Depoto_Order {
 				echo '<br>';
 			}
 		} catch ( Exception $e ) {
+			$this->order->add_order_note( $e->getMessage() );
 			return false;
 		}
 
@@ -295,7 +296,7 @@ class Depoto_Order {
 			$product_item['type']     = 'product';
 			$product_item['quantity'] = $item->get_quantity();
 			$product_item['price']    = $product->get_price();
-			$product_item['vat']      = $this->get_vat_depoto_id( $item->get_subtotal(), $item->get_subtotal_tax() );
+			$product_item['vat']      = (int)$this->get_vat_depoto_id( $item->get_subtotal(), $item->get_subtotal_tax() );
 
 			$return_array[] = $product_item;
 		}
@@ -312,7 +313,7 @@ class Depoto_Order {
 		$shpping_item['type']     = 'shipping';
 		$shpping_item['quantity'] = 1;
 		$shpping_item['price']    = round( $shipping_total + $shipping_tax );
-		$shpping_item['vat']      = $this->get_shipping_vat_id();
+		$shpping_item['vat']      = (int) $this->get_shipping_vat_id();
 		$return_array[]           = $shpping_item;
 
 		/* Get payment item */
@@ -335,7 +336,7 @@ class Depoto_Order {
 		$payment_item['type']     = 'payment';
 		$payment_item['quantity'] = 1;
 		$payment_item['price']    = $fee_total_with_tax;
-		$payment_item['vat']      = $vat_depoto_id;
+		$payment_item['vat']      = (int) $vat_depoto_id;
 
 		$return_array[] = $payment_item;
 

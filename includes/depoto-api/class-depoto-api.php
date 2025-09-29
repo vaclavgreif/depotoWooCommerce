@@ -406,12 +406,7 @@ class Depoto_API {
 	}
 
 	public function create_order( $data ): int {
-		try {
-			$result = $this->depoto->mutation( 'createOrder', $data, [ 'data' => [ 'id' ] ] );
-		} catch ( Exception $e ) {
-			return 0;
-		}
-
+		$result = $this->depoto->mutation( 'createOrder', $data, [ 'data' => [ 'id' ] ] );
 		return $result['data']['id'];
 	}
 
