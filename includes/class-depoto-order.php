@@ -114,10 +114,14 @@ class Depoto_Order {
 	}
 
 	private function get_packeta_point_id() {
-		global $wpdb;
-		$result = $wpdb->get_var(
-			"SELECT point_id FROM {$wpdb->prefix}packetery_order WHERE id={$this->order->get_id()}"
-		);
+		$result = $this->order->get_meta('zasilkovna_id_pobocky');
+		if (!$result) {
+			global $wpdb;
+			$result = $wpdb->get_var(
+				"SELECT point_id FROM {$wpdb->prefix}packetery_order WHERE id={$this->order->get_id()}"
+			);
+
+		}
 
 		return $result;
 	}
