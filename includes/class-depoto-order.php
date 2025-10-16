@@ -295,6 +295,24 @@ class Depoto_Order {
 				$product_item['product'] = $depoto_id;
 			}
 
+			// WPML compatibility - get SKU from translated product.
+			if ( defined( 'ICL_SITEPRESS_VERSION' ) && !$product_item['product']) {
+				$default_lang = apply_filters('wpml_default_language', NULL );
+				if (method_exists($product, 'get_variation_id')) {
+					$id = $product->get_variation_id() ?: $product->get_id();
+				} else {
+					$id = $product->get_id();
+				}
+
+				$original_id  = apply_filters( 'wpml_object_id', $product->get_id(), get_post_type($id), false, $default_lang );
+				if ($original_id) {
+					$depoto_id = get_post_meta( $original_id, '_depoto_id', true );
+					if ( ! empty( $depoto_id ) ) {
+						$product_item['product'] = $depoto_id;
+					}
+				}
+			}
+
 			$product_item['code']     = $product->get_sku();
 			$product_item['name']     = $item->get_name();
 			$product_item['type']     = 'product';
