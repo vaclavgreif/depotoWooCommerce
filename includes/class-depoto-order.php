@@ -209,11 +209,16 @@ class Depoto_Order {
 	 */
 	public function process_address( $is_billing ) {
 		if ( $is_billing ) {
+			$street = $this->order->get_billing_address_1();
+			if ($this->order->get_billing_address_2()) {
+				$street .= ' ' . $this->order->get_billing_address_2();
+			}
+
 			/* Billing */
 			$return_array['firstName']   = $this->order->get_billing_first_name() ?? '';
 			$return_array['lastName']    = $this->order->get_billing_last_name() ?? '';
 			$return_array['companyName'] = $this->order->get_billing_company() ?? '';
-			$return_array['street']      = $this->order->get_billing_address_1() ?? '';
+			$return_array['street']      = $street;
 			$return_array['city']        = $this->order->get_billing_city() ?? '';
 			$return_array['zip']         = $this->order->get_billing_postcode() ?? '';
 			$return_array['country']     = $this->order->get_billing_country() ?? '';
@@ -221,11 +226,16 @@ class Depoto_Order {
 			$return_array['phone']       = $this->order->get_billing_phone() ?? '';
 			$return_array['isBilling']   = $is_billing;
 		} else {
+			$street = $this->order->get_shipping_address_1();
+			if ($this->order->get_shipping_address_2()) {
+				$street .= ' ' . $this->order->get_shipping_address_2();
+			}
+
 			/* Shipping */
 			$return_array['firstName']   = $this->order->get_shipping_first_name() ?? '';
 			$return_array['lastName']    = $this->order->get_shipping_last_name() ?? '';
 			$return_array['companyName'] = $this->order->get_shipping_company() ?? '';
-			$return_array['street']      = $this->order->get_shipping_address_1() ?? '';
+			$return_array['street']      = $street;
 			$return_array['city']        = $this->order->get_shipping_city() ?? '';
 			$return_array['zip']         = $this->order->get_shipping_postcode() ?? '';
 			$return_array['country']     = $this->order->get_shipping_country() ?? '';
