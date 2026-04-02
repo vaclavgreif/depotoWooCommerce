@@ -88,29 +88,41 @@ class Depoto_Order {
 			return $res_depoto_vat_id;
 		}
 
-		$keys          = array_keys( $this->taxes_pairs );
-		$max_key       = max( $keys );
-		$depoto_vat_id = $this->taxes_pairs[ $max_key ];
-
-		return $depoto_vat_id;
+		return $this->get_default_vat_depoto_id();
 	}
 
 	private function get_shipping_vat_id() {
+		if ( empty( $this->taxes_pairs ) ) {
+			return 0;
+		}
+
 		$taxes = [];
 		foreach ( $this->order->get_taxes() as $tax ) {
 			$taxes[] = $tax->get_rate_percent();
 		}
-		$max_tax = max( $taxes );
+		$max_tax = ! empty( $taxes ) ? max( $taxes ) : null;
 
-		$depoto_vat_id = $this->taxes_pairs[ $max_tax ] ?? null;
+		$depoto_vat_id = null !== $max_tax ? ( $this->taxes_pairs[ $max_tax ] ?? null ) : null;
 		if ( empty( $depoto_vat_id ) ) {
-			$keys    = array_keys( $this->taxes_pairs );
-			$max_key = max( $keys );
-
-			return $this->taxes_pairs[ $max_key ];
+			return $this->get_default_vat_depoto_id();
 		}
 
 		return $depoto_vat_id;
+	}
+
+	private function get_default_vat_depoto_id() {
+		if ( empty( $this->taxes_pairs ) ) {
+			return 0;
+		}
+
+		$keys = array_keys( $this->taxes_pairs );
+		if ( empty( $keys ) ) {
+			return 0;
+		}
+
+		$max_key = max( $keys );
+
+		return intval( $this->taxes_pairs[ $max_key ] ?? 0 );
 	}
 
 	private function get_packeta_point_id() {
