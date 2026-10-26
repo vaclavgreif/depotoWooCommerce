@@ -59,70 +59,45 @@ class Depoto_Order {
 	private function get_taxes_pairs() {
 		$taxes_options = get_option( 'depoto_taxes' );
 
-		if ( ! $taxes_options ) {
+		if ( ! is_array( $taxes_options ) ) {
 			return [];
 		}
 
 		$result = [];
-		/**
-		 * @var string $wc_tax_id format is 'tax_id_2'
-		 */
 		foreach ( $taxes_options as $wc_tax_id => $depoto_id ) {
-			$tax_id                      = substr( $wc_tax_id, 7 ); // format is 'tax_id_2' so we want just the number of id
-			$tax_rate_percent            = WC_Tax::get_rate_percent_value( intval( $tax_id ) );
-			$result[ $tax_rate_percent ] = $depoto_id;
+			$tax_id           = substr( $wc_tax_id, 7 ); // Format: tax_id_2.
+			$tax_rate_percent = WC_Tax::get_rate_percent_value( intval( $tax_id ) );
+			$depoto_id        = filter_var( $depoto_id, FILTER_VALIDATE_INT, [ 'options' => [ 'min_range' => 1 ] ] );
+
+			// An unselected VAT is not DEPOTO record ID 0.
+			$result[ $tax_rate_percent ] = false === $depoto_id ? null : $depoto_id;
 		}
 
 		return $result;
 	}
 
-	private function get_vat_depoto_id( $price_with_tax, $tax ) {
-		$res_depoto_vat_id = 0;
-
-		if ( ! empty( $price_with_tax ) && ! empty( $tax ) ) {
-			$percent           = intval( round( ( 100 / $price_with_tax ) * $tax ) );
-			$res_depoto_vat_id = intval( $this->taxes_pairs[ $percent ] ?? 0 );
-		}
-
-		if ( $res_depoto_vat_id ) {
-			return $res_depoto_vat_id;
-		}
-
-		return $this->get_default_vat_depoto_id();
-	}
-
-	private function get_shipping_vat_id() {
-		if ( empty( $this->taxes_pairs ) ) {
-			return 0;
-		}
-
-		$taxes = [];
-		foreach ( $this->order->get_taxes() as $tax ) {
-			$taxes[] = $tax->get_rate_percent();
-		}
-		$max_tax = ! empty( $taxes ) ? max( $taxes ) : null;
-
-		$depoto_vat_id = null !== $max_tax ? ( $this->taxes_pairs[ $max_tax ] ?? null ) : null;
-		if ( empty( $depoto_vat_id ) ) {
+	private function get_vat_depoto_id( $price_without_tax, $tax ): ?int {
+		if ( empty( $tax ) ) {
 			return $this->get_default_vat_depoto_id();
 		}
 
-		return $depoto_vat_id;
+		if ( empty( $price_without_tax ) ) {
+			return null;
+		}
+
+		$percent = intval( round( ( 100 / $price_without_tax ) * $tax ) );
+
+		// Honour No VAT for this rate; do not substitute another rate's mapping.
+		return $this->taxes_pairs[ $percent ] ?? null;
 	}
 
-	private function get_default_vat_depoto_id() {
-		if ( empty( $this->taxes_pairs ) ) {
-			return 0;
-		}
+	private function get_shipping_vat_id(): ?int {
+		return $this->get_vat_depoto_id( $this->order->get_shipping_total(), $this->order->get_shipping_tax() );
+	}
 
-		$keys = array_keys( $this->taxes_pairs );
-		if ( empty( $keys ) ) {
-			return 0;
-		}
-
-		$max_key = max( $keys );
-
-		return intval( $this->taxes_pairs[ $max_key ] ?? 0 );
+	private function get_default_vat_depoto_id(): ?int {
+		// Untaxed lines may use an explicitly mapped zero-percent VAT record.
+		return $this->taxes_pairs[0] ?? null;
 	}
 
 	private function get_packeta_point_id() {
@@ -340,7 +315,10 @@ class Depoto_Order {
 			$product_item['type']     = 'product';
 			$product_item['quantity'] = $item->get_quantity();
 			$product_item['price']    = $product->get_price();
-			$product_item['vat']      = (int)$this->get_vat_depoto_id( $item->get_subtotal(), $item->get_subtotal_tax() );
+			$vat_depoto_id = $this->get_vat_depoto_id( $item->get_subtotal(), $item->get_subtotal_tax() );
+			if ( null !== $vat_depoto_id ) {
+				$product_item['vat'] = $vat_depoto_id;
+			}
 
 			$return_array[] = $product_item;
 		}
@@ -357,7 +335,10 @@ class Depoto_Order {
 		$shpping_item['type']     = 'shipping';
 		$shpping_item['quantity'] = 1;
 		$shpping_item['price']    = round( $shipping_total + $shipping_tax );
-		$shpping_item['vat']      = (int) $this->get_shipping_vat_id();
+		$shipping_vat_id = $this->get_shipping_vat_id();
+		if ( null !== $shipping_vat_id ) {
+			$shpping_item['vat'] = $shipping_vat_id;
+		}
 		$return_array[]           = $shpping_item;
 
 		/* Get payment item */
@@ -380,7 +361,9 @@ class Depoto_Order {
 		$payment_item['type']     = 'payment';
 		$payment_item['quantity'] = 1;
 		$payment_item['price']    = $fee_total_with_tax;
-		$payment_item['vat']      = (int) $vat_depoto_id;
+		if ( null !== $vat_depoto_id ) {
+			$payment_item['vat'] = $vat_depoto_id;
+		}
 
 		$return_array[] = $payment_item;
 

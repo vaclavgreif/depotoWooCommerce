@@ -72,7 +72,7 @@ class Depoto_Taxes
 
 	private function add_field($id, $value, $depoto_taxes_pairs)
 	{
-		$depoto_taxes_pairs = array_replace(['' => __('-- Select --', 'depoto')], $depoto_taxes_pairs);
+		$depoto_taxes_pairs = array_replace(['' => __('No VAT', 'depoto')], $depoto_taxes_pairs);
 		add_settings_field(
 			$id,
 			__($value, 'depoto'),
@@ -83,10 +83,10 @@ class Depoto_Taxes
 				foreach ($depoto_taxes_pairs as $depoto_id => $depoto_title) {
 					$selected = '';
 					$depoto_tax_id = $this->depoto_taxes_options[$id] ?? '';
-					if (!empty($depoto_tax_id) && $depoto_id == $depoto_tax_id) {
+					if ((string) $depoto_id === (string) $depoto_tax_id) {
 						$selected  = 'selected';
 					}
-					echo "<option value='$depoto_id' " . $selected . ">$depoto_title</option>";
+					echo "<option value='" . esc_attr($depoto_id) . "' " . $selected . ">" . esc_html($depoto_title) . "</option>";
 				}
 				echo '</select>';
 			},
@@ -109,7 +109,9 @@ class Depoto_Taxes
 		add_settings_section(
 			'depoto_taxes',
 			__('Taxes', 'depoto'),
-			'',
+			function () {
+				echo '<p>' . esc_html__('Select No VAT to leave VAT unspecified in DEPOTO. If WooCommerce has no tax rates, VAT is omitted automatically. DEPOTO may apply its own defaults.', 'depoto') . '</p>';
+			},
 			'depoto'
 		);
 	}
@@ -126,7 +128,8 @@ class Depoto_Taxes
 		foreach ($this->taxes as $tax_id => $tax_title) {
 			$tax_item = filter_input(INPUT_POST, $tax_id, FILTER_DEFAULT);
 
-			if (!empty($tax_item)) {
+			if (null !== $tax_item && false !== $tax_item) {
+				// Save an empty selection too, so No VAT clears the previous mapping.
 				$depoto_taxes[$tax_id] = $tax_item;
 			}
 		}
