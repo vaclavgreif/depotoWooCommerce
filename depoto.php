@@ -8,7 +8,7 @@
  * Author URI:      https://www.depoto.cz
  * Text Domain:     depoto
  * Domain Path:     /languages
- * Version:         1.2.5
+ * Version:         1.2.8
  *
  * @package         Depoto
  */
@@ -214,7 +214,7 @@ class Depoto {
 
 	function init_taxes_section() {
 		require_once plugin_dir_path( __FILE__ ) . 'includes/class-depoto-taxes.php';
-		$this->depoto_taxes = new Depoto_Taxes( $this->depoto_api->get_taxes_pairs() );
+		$this->depoto_taxes = new Depoto_Taxes( $this->depoto_api->get_taxes_pairs(), $this->depoto_api->get_taxes_pairs( true ) );
 	}
 
 	function init_settings_section() {

@@ -1,9 +1,10 @@
 <?php
 
 require __DIR__ . '/vendor/autoload.php';
+require_once dirname( __DIR__ ) . '/class-depoto-diagnostics.php';
 
 use Depoto\Client;
-use Monolog\Handler\StreamHandler;
+use Monolog\Handler\NullHandler;
 use Monolog\Logger;
 use Nyholm\Psr7\Factory\Psr17Factory;
 use Symfony\Component\Cache\Adapter\ArrayAdapter;
@@ -18,6 +19,7 @@ class Depoto_API {
 	private $url;
 	private $username;
 	private $password;
+	private $vat_records;
 
 	public function __construct() {
 		if ( ! defined( 'CURL_SSLVERSION_TLSv1_2' ) ) {
@@ -28,11 +30,12 @@ class Depoto_API {
 	}
 
 	public function init_connection() {
+		$this->vat_records = null;
 		try {
 			$httpClient   = new Psr18Client(); // PSR-18 Http client
 			$psr17Factory = new Psr17Factory(); // PSR-17 HTTP Factories,  PSR-7 HTTP message
 			$cache        = new Psr16Cache( new ArrayAdapter() ); // PSR-16 Simple cache
-			$logger       = new Logger( 'Depoto', [ new StreamHandler( 'depoto.log', Logger::DEBUG ) ] ); // PSR-3 Logger
+			$logger       = new Logger( 'Depoto', [ new NullHandler() ] ); // SDK debug messages contain OAuth secrets; use sanitized diagnostics below.
 
 			$depoto = new Client( $httpClient, $psr17Factory, $psr17Factory, $cache, $logger );
 			$depoto
@@ -43,7 +46,7 @@ class Depoto_API {
 				->setPassword( $this->password );
 			$this->depoto = $depoto;
 		} catch ( Exception $e ) {
-			echo $e->getMessage();
+			Depoto_Diagnostics::failure( 'DEPOTO client initialization failed.', $e );
 		}
 	}
 
@@ -82,6 +85,7 @@ class Depoto_API {
 				]
 			);
 		} catch ( Exception $e ) {
+			Depoto_Diagnostics::failure( 'DEPOTO Payment methods could not be loaded.', $e );
 			return $return;
 		}
 
@@ -117,6 +121,7 @@ class Depoto_API {
 				]
 			);
 		} catch ( Exception $e ) {
+			Depoto_Diagnostics::failure( 'DEPOTO Checkouts could not be loaded.', $e );
 			return $return;
 		}
 
@@ -155,6 +160,7 @@ class Depoto_API {
 				]
 			);
 		} catch ( Exception $e ) {
+			Depoto_Diagnostics::failure( 'DEPOTO Carriers could not be loaded.', $e );
 			return $return;
 		}
 
@@ -196,6 +202,7 @@ class Depoto_API {
 				]
 			);
 		} catch ( Exception $e ) {
+			Depoto_Diagnostics::failure( 'DEPOTO Order statuses could not be loaded.', $e );
 			return $return;
 		}
 
@@ -212,38 +219,37 @@ class Depoto_API {
 		return $return;
 	}
 
-	/**
-	 * Get taxes from Depoto
-	 *
-	 * @return array Associative array of Depoto order statuses as ['id_of_order_state' => 'name_of_order_state']
-	 */
-	public function get_taxes_pairs(): array {
+	/** Return account VAT IDs and labels, optionally restricted to genuine 0% records. */
+	public function get_taxes_pairs( bool $zero_only = false ): array {
+		if ( null === $this->vat_records ) {
+			$records = [];
+			try {
+				$page = 1;
+				do {
+					$result = $this->depoto->query(
+						'vats',
+						[ 'page' => $page ],
+						[ 'items' => [ 'id', 'name', 'percent' ], 'paginator' => [ 'last' ] ]
+					);
+					$records = array_merge( $records, $result['items'] ?? [] );
+					$last_page = (int) ( $result['paginator']['last'] ?? 1 );
+					$page++;
+				} while ( $page <= $last_page );
+			} catch ( Exception $e ) {
+				Depoto_Diagnostics::failure( 'DEPOTO VAT records could not be loaded.', $e );
+				return [];
+			}
+			$this->vat_records = $records;
+		}
+
 		$return = [];
-		try {
-			$result = $this->depoto->query(
-				'vats',
-				[],
-				[
-					'items' => [
-						'id',
-						'name',
-					],
-				]
-			);
-		} catch ( Exception $e ) {
-			return $return;
-		}
-
-		if ( empty( $result ) ) {
-			return $return;
-		}
-
-		foreach ( $result['items'] as $item ) {
-			if ( ! empty( $item ) ) {
-				$return[ $item['id'] ] = $item['name'];
+		foreach ( $this->vat_records as $item ) {
+			$percent = $item['percent'] ?? null;
+			$is_zero = is_numeric( $percent ) && 0.0 === (float) $percent;
+			if ( ! $zero_only || $is_zero ) {
+				$return[ $item['id'] ] = $item['name'] . ( is_numeric( $percent ) ? ' (' . $percent . '%)' : '' ) . ' [ID ' . (int) $item['id'] . ']';
 			}
 		}
-
 		return $return;
 	}
 
@@ -261,6 +267,7 @@ class Depoto_API {
 				[ 'paginator' => [ 'last' ] ]
 			);
 		} catch ( Exception $e ) {
+			Depoto_Diagnostics::failure( 'DEPOTO Products could not be loaded.', $e );
 			return $return;
 		}
 
@@ -315,6 +322,7 @@ class Depoto_API {
 				]
 			);
 		} catch ( Exception $e ) {
+			Depoto_Diagnostics::failure( 'DEPOTO Product availability lookup failed.', $e, [ 'depoto_id' => (int) $id ] );
 			return $return;
 		}
 
@@ -346,6 +354,7 @@ class Depoto_API {
 				]
 			);
 		} catch ( Exception $e ) {
+			Depoto_Diagnostics::failure( 'DEPOTO Order status lookup failed.', $e, [ 'depoto_id' => (int) $id ] );
 			return $return;
 		}
 
@@ -369,6 +378,7 @@ class Depoto_API {
 				[ 'data' => [ 'id' ] ]
 			);
 		} catch ( Exception $e ) {
+			Depoto_Diagnostics::failure( 'DEPOTO createAddress failed.', $e );
 			return 0;
 		}
 
@@ -405,8 +415,16 @@ class Depoto_API {
 			[ 'errors' ] );
 	}
 
-	public function create_order( $data ): int {
-		$result = $this->depoto->mutation( 'createOrder', $data, [ 'data' => [ 'id' ] ] );
+	public function create_order( $data, $wc_order_id = 0 ): int {
+		$context = [ 'wc_order_id' => (int) $wc_order_id, 'items' => Depoto_Diagnostics::items( $data['items'] ?? [] ) ];
+		Depoto_Diagnostics::write( 'info', 'DEPOTO createOrder request (sanitized).', $context );
+		try {
+			$result = $this->depoto->mutation( 'createOrder', $data, [ 'data' => [ 'id' ] ] );
+		} catch ( \Throwable $e ) {
+			Depoto_Diagnostics::failure( 'DEPOTO createOrder failed.', $e, $context );
+			throw $e;
+		}
+		Depoto_Diagnostics::write( 'info', 'DEPOTO createOrder succeeded.', [ 'wc_order_id' => (int) $wc_order_id, 'depoto_order_id' => (int) $result['data']['id'] ] );
 		return $result['data']['id'];
 	}
 
@@ -414,6 +432,7 @@ class Depoto_API {
 		try {
 			$result = $this->depoto->mutation( 'createProduct', $data, [ 'data' => [ 'id' ] ] );
 		} catch ( Exception $e ) {
+			Depoto_Diagnostics::failure( 'DEPOTO Product creation failed.', $e );
 			return 0;
 		}
 
@@ -424,6 +443,7 @@ class Depoto_API {
 		try {
 			$result = $this->depoto->mutation( 'createFile', $data, [ 'data' => [ 'id' ] ] );
 		} catch ( Exception $e ) {
+			Depoto_Diagnostics::failure( 'DEPOTO File upload failed.', $e );
 			return 0;
 		}
 
@@ -451,6 +471,7 @@ class Depoto_API {
 				]
 			);
 		} catch ( Exception $e ) {
+			Depoto_Diagnostics::failure( 'DEPOTO Connection check failed.', $e );
 			return $return;
 		}
 

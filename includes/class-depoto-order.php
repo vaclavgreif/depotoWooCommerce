@@ -25,7 +25,8 @@ class Depoto_Order {
 	}
 
 	public function schedule_order( $order ) {
-		as_enqueue_async_action( 'depoto_create_order', [ 'order_id' => $order->get_id() ] );
+		$action_id = as_enqueue_async_action( 'depoto_create_order', [ 'order_id' => $order->get_id() ] );
+		Depoto_Diagnostics::write( $action_id ? 'info' : 'error', $action_id ? 'DEPOTO order export queued.' : 'DEPOTO order export could not be queued.', [ 'wc_order_id' => (int) $order->get_id(), 'action_id' => (int) $action_id ] );
 	}
 
 	/**
@@ -65,6 +66,9 @@ class Depoto_Order {
 
 		$result = [];
 		foreach ( $taxes_options as $wc_tax_id => $depoto_id ) {
+			if ( ! preg_match( '/^tax_id_[0-9]+$/', $wc_tax_id ) ) {
+				continue;
+			}
 			$tax_id           = substr( $wc_tax_id, 7 ); // Format: tax_id_2.
 			$tax_rate_percent = WC_Tax::get_rate_percent_value( intval( $tax_id ) );
 			$depoto_id        = filter_var( $depoto_id, FILTER_VALIDATE_INT, [ 'options' => [ 'min_range' => 1 ] ] );
@@ -76,28 +80,34 @@ class Depoto_Order {
 		return $result;
 	}
 
-	private function get_vat_depoto_id( $price_without_tax, $tax ): ?int {
+	private function get_vat_depoto_id( $price_without_tax, $tax ): int {
 		if ( empty( $tax ) ) {
 			return $this->get_default_vat_depoto_id();
 		}
-
 		if ( empty( $price_without_tax ) ) {
-			return null;
+			throw new UnexpectedValueException( __( 'DEPOTO: Cannot determine the VAT rate for an item with tax but no net price.', 'depoto' ) );
 		}
-
 		$percent = intval( round( ( 100 / $price_without_tax ) * $tax ) );
-
-		// Honour No VAT for this rate; do not substitute another rate's mapping.
-		return $this->taxes_pairs[ $percent ] ?? null;
+		$vat_id = $this->taxes_pairs[ $percent ] ?? null;
+		if ( null === $vat_id ) {
+			throw new UnexpectedValueException( sprintf( __( 'DEPOTO: Select a DEPOTO VAT record for the WooCommerce %s%% tax rate in Depoto > Pairing > Taxes before sending this order.', 'depoto' ), $percent ) );
+		}
+		return $vat_id;
 	}
 
-	private function get_shipping_vat_id(): ?int {
+	private function get_shipping_vat_id(): int {
 		return $this->get_vat_depoto_id( $this->order->get_shipping_total(), $this->order->get_shipping_tax() );
 	}
 
-	private function get_default_vat_depoto_id(): ?int {
-		// Untaxed lines may use an explicitly mapped zero-percent VAT record.
-		return $this->taxes_pairs[0] ?? null;
+	private function get_default_vat_depoto_id(): int {
+		$options = get_option( 'depoto_taxes' );
+		$default_id = filter_var( $options['default_vat_id'] ?? '', FILTER_VALIDATE_INT, [ 'options' => [ 'min_range' => 1 ] ] );
+		// Retain existing explicitly mapped WooCommerce zero-percent records as a fallback.
+		$vat_id = false === $default_id ? ( $this->taxes_pairs[0] ?? null ) : $default_id;
+		if ( null === $vat_id ) {
+			throw new UnexpectedValueException( __( 'DEPOTO: Select a 0% DEPOTO VAT record for untaxed items in Depoto > Pairing > Taxes before sending this order. DEPOTO requires a VAT record even when WooCommerce taxes are disabled.', 'depoto' ) );
+		}
+		return $vat_id;
 	}
 
 	private function get_packeta_point_id() {
@@ -114,7 +124,7 @@ class Depoto_Order {
 	}
 
 	public function process_undelivered_orders() {
-		$initial_date = date( 'Y-m-d', strtotime( "-1 week" ) );
+		$initial_date = date( 'Y-m-d', strtotime( '-1 week' ) );
 		$final_date   = date( 'Y-m-d' );
 		$orders       = wc_get_orders(
 			[
@@ -124,18 +134,28 @@ class Depoto_Order {
 			]
 		);
 
+		$counts = [ 'orders' => count( $orders ), 'exported' => 0, 'failed' => 0, 'skipped' => 0 ];
+		Depoto_Diagnostics::write( 'info', 'DEPOTO undelivered-order retry started.', [ 'orders' => count( $orders ) ] );
 		echo 'Total ' . count( $orders ) . ' orders<br>';
 
 		foreach ( $orders as $order ) {
-			$this->process_order( $order->get_id() );
+			$result = $this->process_order( $order->get_id() );
+			$counts[ true === $result ? 'exported' : ( false === $result ? 'failed' : 'skipped' ) ]++;
 		}
+		Depoto_Diagnostics::write( $counts['failed'] ? 'warning' : 'info', 'DEPOTO undelivered-order retry finished.', $counts );
 	}
 
 	public function process_order( $order_id ) {
+		$stage = 'load_order';
 		try {
 			$this->order = wc_get_order( $order_id );
+			if ( ! $this->order ) {
+				Depoto_Diagnostics::write( 'warning', 'DEPOTO export skipped: WooCommerce order not found.', [ 'wc_order_id' => (int) $order_id ] );
+				return false;
+			}
 
 			if ( ! empty( $depoto_order_id = $this->order->get_meta( '_depoto_order_id', true ) ) ) {
+				Depoto_Diagnostics::write( 'info', 'DEPOTO export skipped: order already exported.', [ 'wc_order_id' => (int) $order_id, 'depoto_order_id' => (int) $depoto_order_id ] );
 				if ( is_admin() ) {
 					printf( __( 'Order %s already has depoto order id %s', 'depoto' ), $order_id, $depoto_order_id );
 					echo '<br>';
@@ -144,6 +164,11 @@ class Depoto_Order {
 				return;
 			}
 
+			$stage = 'prepare_items';
+			// Validate VAT mappings before any remote address or order is created.
+			$order_items = $this->process_order_items();
+
+			$stage = 'create_addresses';
 			if ( $this->is_different_shipping_address() ) {
 				$shipping_address = $this->process_address( 0 );
 			} else {
@@ -151,16 +176,16 @@ class Depoto_Order {
 			}
 
 			$billing_address = $this->process_address( 1 );
+			$stage           = 'prepare_order';
 
 			$data_for_depoto = [
 				'status'            => 'reservation',
 				'checkout'          => (int) get_option( 'depoto_checkout_id' ),
-				//'customer' => $resultCustomer['data']['id'], // Nepovinné
 				'invoiceAddress'    => $billing_address,
 				'shippingAddress'   => $shipping_address ?? $billing_address,
 				'currency'          => $this->order->get_currency(),
 				'carrier'           => $this->process_carrier(),
-				'items'             => $this->process_order_items(),
+				'items'             => $order_items,
 				'reservationNumber' => $this->order->get_order_number(),
 				'paymentItems'      => [
 					[
@@ -171,16 +196,20 @@ class Depoto_Order {
 				],
 			];
 
-
-			$result = $this->depoto_api->create_order( $data_for_depoto );
+			$stage  = 'create_order';
+			$result = $this->depoto_api->create_order( $data_for_depoto, $order_id );
+			$stage = 'save_order';
 			$this->order->update_meta_data( '_depoto_order_id', $result );
 			$this->order->save_meta_data();
 			if ( is_admin() ) {
 				printf( __( 'Order %s successfuly sent and received order depoto ID %s', 'depoto' ), $order_id, $result );
 				echo '<br>';
 			}
-		} catch ( Exception $e ) {
-			$this->order->add_order_note( $e->getMessage() );
+		} catch ( \Throwable $e ) {
+			Depoto_Diagnostics::failure( 'DEPOTO order export failed.', $e, [ 'wc_order_id' => (int) $order_id, 'stage' => $stage ] );
+			if ( $this->order ) {
+				$this->order->add_order_note( $e->getMessage() );
+			}
 			return false;
 		}
 
@@ -315,10 +344,7 @@ class Depoto_Order {
 			$product_item['type']     = 'product';
 			$product_item['quantity'] = $item->get_quantity();
 			$product_item['price']    = $product->get_price();
-			$vat_depoto_id = $this->get_vat_depoto_id( $item->get_subtotal(), $item->get_subtotal_tax() );
-			if ( null !== $vat_depoto_id ) {
-				$product_item['vat'] = $vat_depoto_id;
-			}
+			$product_item['vat']      = $this->get_vat_depoto_id( $item->get_subtotal(), $item->get_subtotal_tax() );
 
 			$return_array[] = $product_item;
 		}
@@ -329,17 +355,14 @@ class Depoto_Order {
 		$shipping_method          = current( $this->order->get_items( [ 'shipping' ] ) );
 		$shipping_total           = $this->order->get_shipping_total();
 		$shipping_tax             = $this->order->get_shipping_tax();
-		$shpping_item             = [];
-		$shpping_item['code']     = $shipping_method->get_method_id();
-		$shpping_item['name']     = $shipping_method->get_name();
-		$shpping_item['type']     = 'shipping';
-		$shpping_item['quantity'] = 1;
-		$shpping_item['price']    = round( $shipping_total + $shipping_tax );
-		$shipping_vat_id = $this->get_shipping_vat_id();
-		if ( null !== $shipping_vat_id ) {
-			$shpping_item['vat'] = $shipping_vat_id;
-		}
-		$return_array[]           = $shpping_item;
+		$shipping_item             = [];
+		$shipping_item['code']     = $shipping_method->get_method_id();
+		$shipping_item['name']     = $shipping_method->get_name();
+		$shipping_item['type']     = 'shipping';
+		$shipping_item['quantity'] = 1;
+		$shipping_item['price']    = round( $shipping_total + $shipping_tax );
+		$shipping_item['vat']      = $this->get_shipping_vat_id();
+		$return_array[]           = $shipping_item;
 
 		/* Get payment item */
 
@@ -361,9 +384,7 @@ class Depoto_Order {
 		$payment_item['type']     = 'payment';
 		$payment_item['quantity'] = 1;
 		$payment_item['price']    = $fee_total_with_tax;
-		if ( null !== $vat_depoto_id ) {
-			$payment_item['vat'] = $vat_depoto_id;
-		}
+		$payment_item['vat']      = $vat_depoto_id;
 
 		$return_array[] = $payment_item;
 
@@ -395,11 +416,17 @@ class Depoto_Order {
 
 
 	public function update_order_payment_status( $order_id ) {
-		$this->order     = wc_get_order( $order_id );
-		$depoto_order_id = $this->order->get_meta( '_depoto_order_id' );
-		if ( ! $depoto_order_id ) {
+		$this->order = wc_get_order( $order_id );
+		if ( ! $this->order ) {
+			Depoto_Diagnostics::write( 'warning', 'DEPOTO payment update skipped: WooCommerce order not found.', [ 'wc_order_id' => (int) $order_id ] );
 			return;
 		}
+		$depoto_order_id = $this->order->get_meta( '_depoto_order_id' );
+		if ( ! $depoto_order_id ) {
+			Depoto_Diagnostics::write( 'info', 'DEPOTO payment update skipped: order has no DEPOTO ID.', [ 'wc_order_id' => (int) $order_id ] );
+			return;
+		}
+		$context = [ 'wc_order_id' => (int) $order_id, 'depoto_order_id' => (int) $depoto_order_id ];
 
 		try {
 			$this->depoto_api->update_order(
@@ -414,23 +441,34 @@ class Depoto_Order {
 					],
 				]
 			);
+			Depoto_Diagnostics::write( 'info', 'DEPOTO payment marked as paid.', $context );
 			$this->order->add_order_note( __( 'Depoto order set to paid.', 'depoto' ) );
 		} catch ( Exception $e ) {
+			Depoto_Diagnostics::failure( 'DEPOTO payment update failed.', $e, $context );
 			$this->order->add_order_note( sprintf( __( 'Depoto order payment status update failed, error: %s', 'depoto' ), $e->getMessage() ) );
 		}
 	}
 
 	public function cancel_order( $order_id ) {
 		$order = wc_get_order( $order_id );
+		if ( ! $order ) {
+			Depoto_Diagnostics::write( 'warning', 'DEPOTO cancellation skipped: WooCommerce order not found.', [ 'wc_order_id' => (int) $order_id ] );
+			return;
+		}
 		if ( ! empty( $depoto_order_id = $order->get_meta( '_depoto_order_id', true ) ) ) {
+			$context = [ 'wc_order_id' => (int) $order_id, 'depoto_order_id' => (int) $depoto_order_id ];
 			try {
 				$this->depoto_api->cancel_order(
 					$depoto_order_id
 				);
+				Depoto_Diagnostics::write( 'info', 'DEPOTO order cancelled.', $context );
 				$order->add_order_note( __( 'Depoto order cancelled.', 'depoto' ) );
 			} catch ( Exception $e ) {
+				Depoto_Diagnostics::failure( 'DEPOTO order cancellation failed.', $e, $context );
 				$order->add_order_note( sprintf( __( 'Depoto order cancellation failed, error: %s', 'depoto' ), $e->getMessage() ) );
 			}
+		} else {
+			Depoto_Diagnostics::write( 'info', 'DEPOTO cancellation skipped: order has no DEPOTO ID.', [ 'wc_order_id' => (int) $order_id ] );
 		}
 	}
 }

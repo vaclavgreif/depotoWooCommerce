@@ -23,7 +23,6 @@ class Depoto_Webhook
 	 */
 	private $order_status_pairs;
 
-	private const LOG_FILE = __DIR__ . '/log.txt';
 	private const ACTION_HOOK = 'depoto_process_webhook_record';
 	private const ACTION_GROUP = 'depoto';
 	private const MAX_ATTEMPTS = 3;
@@ -46,15 +45,22 @@ class Depoto_Webhook
 		add_filter('woocommerce_product_data_store_cpt_get_products_query', [$this, 'handle_depoto_product_query_var'], 10, 2);
 	}
 
-	private function log_debug(string $message, array $context = []): void
+	private function log_event(string $message, array $context = []): void
 	{
-		if (!defined('depoto_log') || constant('depoto_log') !== true) {
-			return;
-		}
-
-		$timestamp = gmdate('Y-m-d H:i:s');
-		$payload = $context ? ' ' . wp_json_encode($context) : '';
-		error_log("[{$timestamp}] {$message}{$payload}" . PHP_EOL, 3, self::LOG_FILE);
+		$levels = [
+			'grab_data: invalid record, skipping schedule' => 'warning',
+			'grab_data: action scheduler missing' => 'error',
+			'grab_data: failed to schedule action' => 'error',
+			'grab_data: scheduled action' => 'info',
+			'process_scheduled_record: invalid record' => 'warning',
+			'process_scheduled_record: skipped unsupported type' => 'notice',
+			'process_scheduled_record: processed successfully' => 'info',
+			'process_scheduled_record: skipped permanently' => 'notice',
+			'process_scheduled_record: max attempts reached, giving up' => 'error',
+			'process_scheduled_record: failed to schedule retry' => 'error',
+			'process_scheduled_record: rescheduled retry' => 'warning',
+		];
+		Depoto_Diagnostics::write($levels[$message] ?? 'debug', 'DEPOTO webhook ' . $message, Depoto_Diagnostics::webhook_context($context));
 	}
 
 	private function result(string $status, array $context = []): array
@@ -99,7 +105,6 @@ class Depoto_Webhook
 		nocache_headers();
 
 		$data_array = $data->get_json_params();
-		$this->log_debug('grab_data: received payload', ['data' => $data_array]);
 
 		$record = [
 			'type' => sanitize_text_field($data_array['type'] ?? ''),
@@ -111,7 +116,7 @@ class Depoto_Webhook
 		];
 
 		if (empty($record['type']) || empty($record['id'])) {
-			$this->log_debug('grab_data: invalid record, skipping schedule', ['record' => $record]);
+			$this->log_event('grab_data: invalid record, skipping schedule', ['record' => $record]);
 
 			return new WP_REST_Response([
 				'scheduled' => false,
@@ -121,7 +126,7 @@ class Depoto_Webhook
 		}
 
 		if (!function_exists('as_enqueue_async_action')) {
-			$this->log_debug('grab_data: action scheduler missing', ['record' => $record]);
+			$this->log_event('grab_data: action scheduler missing', ['record' => $record]);
 
 			return new WP_REST_Response([
 				'scheduled' => false,
@@ -133,7 +138,7 @@ class Depoto_Webhook
 		$action_id = as_enqueue_async_action(self::ACTION_HOOK, [$record], self::ACTION_GROUP);
 
 		if (empty($action_id)) {
-			$this->log_debug('grab_data: failed to schedule action', ['record' => $record]);
+			$this->log_event('grab_data: failed to schedule action', ['record' => $record]);
 
 			return new WP_REST_Response([
 				'scheduled' => false,
@@ -142,7 +147,7 @@ class Depoto_Webhook
 			], 500);
 		}
 
-		$this->log_debug('grab_data: scheduled action', [
+		$this->log_event('grab_data: scheduled action', [
 			'action_id' => $action_id,
 			'record' => $record,
 		]);
@@ -167,7 +172,7 @@ class Depoto_Webhook
 		echo esc_html($message);
 		echo '<br><br>';
 
-		$this->log_debug('process_webhook_stack: no-op, action scheduler handles processing');
+		$this->log_event('process_webhook_stack: no-op, action scheduler handles processing');
 	}
 
 	/**
@@ -179,13 +184,13 @@ class Depoto_Webhook
 	public function process_scheduled_record($record): void
 	{
 		if (!is_array($record)) {
-			$this->log_debug('process_scheduled_record: invalid record');
+			$this->log_event('process_scheduled_record: invalid record');
 			return;
 		}
 
 		$record['attempts'] = intval($record['attempts'] ?? 0) + 1;
 
-		$this->log_debug('process_scheduled_record: start', [
+		$this->log_event('process_scheduled_record: start', [
 			'type' => $record['type'] ?? '',
 			'id' => intval($record['id'] ?? 0),
 			'attempts' => $record['attempts'],
@@ -203,7 +208,7 @@ class Depoto_Webhook
 				break;
 
 			default:
-				$this->log_debug('process_scheduled_record: skipped unsupported type', [
+				$this->log_event('process_scheduled_record: skipped unsupported type', [
 					'type' => $record['type'] ?? '',
 					'id' => intval($record['id'] ?? 0),
 				]);
@@ -215,7 +220,7 @@ class Depoto_Webhook
 		}
 
 		if ($result['status'] === self::RESULT_SUCCESS) {
-			$this->log_debug('process_scheduled_record: processed successfully', [
+			$this->log_event('process_scheduled_record: processed successfully', [
 				'type' => $record['type'] ?? '',
 				'id' => intval($record['id'] ?? 0),
 				'attempts' => $record['attempts'],
@@ -225,7 +230,7 @@ class Depoto_Webhook
 		}
 
 		if ($result['status'] === self::RESULT_SKIP) {
-			$this->log_debug('process_scheduled_record: skipped permanently', [
+			$this->log_event('process_scheduled_record: skipped permanently', [
 				'type' => $record['type'] ?? '',
 				'id' => intval($record['id'] ?? 0),
 				'attempts' => $record['attempts'],
@@ -235,7 +240,7 @@ class Depoto_Webhook
 		}
 
 		if ($record['attempts'] >= self::MAX_ATTEMPTS) {
-			$this->log_debug('process_scheduled_record: max attempts reached, giving up', [
+			$this->log_event('process_scheduled_record: max attempts reached, giving up', [
 				'type' => $record['type'] ?? '',
 				'id' => intval($record['id'] ?? 0),
 				'attempts' => $record['attempts'],
@@ -252,7 +257,7 @@ class Depoto_Webhook
 		);
 
 		if (empty($next_action_id)) {
-			$this->log_debug('process_scheduled_record: failed to schedule retry', [
+			$this->log_event('process_scheduled_record: failed to schedule retry', [
 				'type' => $record['type'] ?? '',
 				'id' => intval($record['id'] ?? 0),
 				'attempts' => $record['attempts'],
@@ -261,7 +266,7 @@ class Depoto_Webhook
 			return;
 		}
 
-		$this->log_debug('process_scheduled_record: rescheduled retry', [
+		$this->log_event('process_scheduled_record: rescheduled retry', [
 			'type' => $record['type'] ?? '',
 			'id' => intval($record['id'] ?? 0),
 			'attempts' => $record['attempts'],
@@ -290,17 +295,17 @@ class Depoto_Webhook
 		nocache_headers();
 
 		$id = intval($record['id'] ?? 0);
-		$this->log_debug('process_product_availability: start', ['id' => $id]);
+		$this->log_event('process_product_availability: start', ['id' => $id]);
 
 		$quantity_available = $this->depoto_api->get_product_availability_by_ID($id);
 		if (-1 === $quantity_available) {
-			$this->log_debug('process_product_availability: depoto returned -1', ['id' => $id]);
+			$this->log_event('process_product_availability: depoto returned -1', ['id' => $id]);
 			return $this->result(self::RESULT_RETRY, ['reason' => 'depoto_unavailable']);
 		}
 
 		$product = $this->get_product_by_depoto_id($id);
 		if (empty($product)) {
-			$this->log_debug('process_product_availability: product not found', ['id' => $id]);
+			$this->log_event('process_product_availability: product not found', ['id' => $id]);
 			return $this->result(self::RESULT_SKIP, ['reason' => 'product_not_found']);
 		}
 
@@ -310,7 +315,7 @@ class Depoto_Webhook
 		$product->set_stock_quantity($quantity_available);
 		$product->save();
 
-		$this->log_debug('process_product_availability: updated stock', [
+		$this->log_event('process_product_availability: updated stock', [
 			'id' => $id,
 			'quantity' => $quantity_available,
 		]);
@@ -381,20 +386,20 @@ class Depoto_Webhook
 	private function process_order_status($record): array
 	{
 		$id = intval($record['id'] ?? 0);
-		$this->log_debug('process_order_status: start', [
+		$this->log_event('process_order_status: start', [
 			'id' => $id,
 			'type' => $record['type'] ?? '',
 		]);
 
 		$depoto_order_status = $this->depoto_api->get_order_status_by_ID($id);
 		if (!$depoto_order_status) {
-			$this->log_debug('process_order_status: depoto status missing', ['id' => $id]);
+			$this->log_event('process_order_status: depoto status missing', ['id' => $id]);
 			return $this->result(self::RESULT_RETRY, ['reason' => 'depoto_status_missing']);
 		}
 
 		$woocommerce_order = $this->get_order_by_depoto_id($id);
 		if (empty($woocommerce_order)) {
-			$this->log_debug('process_order_status: order not found', ['id' => $id]);
+			$this->log_event('process_order_status: order not found', ['id' => $id]);
 			return $this->result(self::RESULT_RETRY, ['reason' => 'order_not_found']);
 		}
 
@@ -404,7 +409,7 @@ class Depoto_Webhook
 			isset($this->order_status_pairs[$woocommerce_order_state]) &&
 			$this->order_status_pairs[$woocommerce_order_state] === $depoto_order_status
 		) {
-			$this->log_debug('process_order_status: status already matches', [
+			$this->log_event('process_order_status: status already matches', [
 				'id' => $id,
 				'status' => $depoto_order_status,
 			]);
@@ -413,7 +418,7 @@ class Depoto_Webhook
 
 		$woocommerce_order_new_state_key = array_search($depoto_order_status, $this->order_status_pairs, true);
 		if ($woocommerce_order_new_state_key === false) {
-			$this->log_debug('process_order_status: no matching woo state', [
+			$this->log_event('process_order_status: no matching woo state', [
 				'id' => $id,
 				'depoto_status' => $depoto_order_status,
 			]);
@@ -437,7 +442,7 @@ class Depoto_Webhook
 		printf(__('%s setted order status to %s', 'depoto'), $id, $woocommerce_order_new_state_key);
 		echo '<br>';
 
-		$this->log_debug('process_order_status: updated', [
+		$this->log_event('process_order_status: updated', [
 			'id' => $id,
 			'new_status' => $woocommerce_order_new_state_key,
 		]);

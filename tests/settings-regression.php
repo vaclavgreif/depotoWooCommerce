@@ -21,14 +21,26 @@ try {
         return json_decode(file_get_contents('http://' . $address . '/', false, $context), true, 512, JSON_THROW_ON_ERROR);
     };
     $cleared = $request(['tax_id_1' => '']);
-    if ($cleared['saved']['tax_id_1'] !== '' || $cleared['saved']['tax_id_3'] !== '81' || strpos($cleared['html'], "value='' selected>No VAT") === false) {
-        throw new RuntimeException('No VAT did not clear and redisplay the saved mapping');
+    if ($cleared['saved']['tax_id_1'] !== '' || $cleared['saved']['tax_id_3'] !== '81' || strpos($cleared['html'], "value='' selected>Select a DEPOTO VAT record") === false) {
+        throw new RuntimeException('Blank selection did not clear and redisplay the saved mapping');
     }
     $selected = $request(['tax_id_1' => '73']);
     if ($selected['saved']['tax_id_1'] !== '73') { throw new RuntimeException('Valid VAT selection was not saved'); }
     $missing = $request(['unrelated' => 'value']);
     if ($missing['saved']['tax_id_1'] !== '82' || $missing['saved']['tax_id_3'] !== '81') { throw new RuntimeException('Absent fields overwrote existing mappings'); }
-    echo 'PASS: No VAT clears and redisplays a saved mapping; selected IDs save; absent fields are preserved.' . PHP_EOL;
+    $default = $request(['no_wc_rates' => '1', 'default_vat_id' => '74']);
+    if ($default['saved']['default_vat_id'] !== '74' || strpos($default['html'], "value='74' selected") === false || $default['saved']['tax_id_1'] !== '82') {
+        throw new RuntimeException('0% default did not save and redisplay without WooCommerce rates');
+    }
+    foreach (['82', '999', 'invalid', '0'] as $invalid) {
+        $rejected = $request(['no_wc_rates' => '1', 'default_vat_id' => $invalid]);
+        if ($rejected['saved']['default_vat_id'] !== '73' || count($rejected['errors']) !== 1) { throw new RuntimeException('Invalid/nonzero record was accepted'); }
+    }
+    $clearedDefault = $request(['no_wc_rates' => '1', 'default_vat_id' => '']);
+    if ($clearedDefault['saved']['default_vat_id'] !== '') { throw new RuntimeException('Default cannot be cleared'); }
+    $missingDefault = $request(['no_wc_rates' => '1']);
+    if ($missingDefault['saved']['default_vat_id'] !== '73') { throw new RuntimeException('Absent default field overwrote existing selection'); }
+    echo 'PASS: VAT mappings save/clear; 0% default works without WooCommerce rates; invalid/nonzero defaults rejected; absent fields preserved.' . PHP_EOL;
 } finally {
     proc_terminate($process);
     proc_close($process);
